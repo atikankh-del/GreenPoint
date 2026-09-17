@@ -28,7 +28,9 @@ class GreenPointTest extends TestCase
     public function test_member_can_submit_activity(): void
     {
         $user=User::where('email','kan@greenpoint.test')->firstOrFail();
-        $this->actingAs($user)->post('/posts',['content'=>'ทดสอบปลูกต้นไม้','activity_type_id'=>1,'tree_count'=>2,'privacy'=>'public','request_points'=>1])->assertSessionHas('success');
+        \Illuminate\Support\Facades\Storage::fake('evidence');
+        $image=\Illuminate\Http\UploadedFile::fake()->createWithContent('tree.png',file_get_contents(base_path('tests/Fixtures/evidence.png')));
+        $this->actingAs($user)->post('/posts',['image'=>$image,'content'=>'ทดสอบปลูกต้นไม้','activity_type_id'=>1,'tree_count'=>2,'privacy'=>'public','request_points'=>1])->assertSessionHas('success');
         $this->assertDatabaseHas('posts',['content'=>'ทดสอบปลูกต้นไม้','status'=>'pending']);
     }
 

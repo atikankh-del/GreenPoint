@@ -29,6 +29,14 @@ return [
     */
 
     'disks' => [
+        // Evidence is never exposed through a storage symlink or a signed storage URL.
+        'evidence' => [
+            'driver' => 'local',
+            'root' => storage_path('app/evidence'),
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
 
         'local' => [
             'driver' => 'local',
