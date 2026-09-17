@@ -1,14 +1,61 @@
 <?php
 namespace App\Http\Controllers;
-use App\Models\{ActivityType,Badge,Challenge,Comment,Like,PointsTransaction,Post,Report,Reward,RewardRedemption,SystemSetting,User}; use Illuminate\Http\Request; use Illuminate\Support\Facades\{Auth,DB,Hash}; use Illuminate\Support\Str;
+use App\Models\{ActivityType,Badge,Challenge,Comment,Like,PointsTransaction,Post,Report,Reward,RewardRedemption,SystemSetting,User}; use Illuminate\Http\Request; use Illuminate\Support\Facades\{Auth,DB,Hash,Storage}; use Illuminate\Support\Str;
 class GreenPointController extends Controller {
  public function home(){return Auth::check()?redirect()->route('feed'):view('landing');} public function loginForm(){return view('auth',['mode'=>'login']);} public function registerForm(){return view('auth',['mode'=>'register']);}
  public function login(Request $r){$d=$r->validate(['email'=>'required|email','password'=>'required']);if(Auth::attempt($d)){if(Auth::user()->status!=='active'){Auth::logout();return back()->withErrors(['email'=>'บัญชีนี้ถูกระงับ กรุณาติดต่อผู้ดูแล']);}$r->session()->regenerate();return redirect()->route(Auth::user()->role==='admin'?'admin':'feed');}return back()->withErrors(['email'=>'อีเมลหรือรหัสผ่านไม่ถูกต้อง'])->onlyInput('email');}
  public function register(Request $r){$d=$r->validate(['name'=>'required|max:80','email'=>'required|email|unique:users','password'=>'required|min:8|confirmed']);$u=User::create(['name'=>$d['name'],'email'=>$d['email'],'password'=>Hash::make($d['password'])]);Auth::login($u);return redirect()->route('feed')->with('success','ยินดีต้อนรับสู่ GreenPoint!');} public function logout(Request $r){Auth::logout();$r->session()->invalidate();$r->session()->regenerateToken();return redirect('/');}
  public function feed(){return view('feed',['posts'=>Post::with(['user','activityType','likes','comments.user'])->where('privacy','public')->whereIn('status',['published','approved'])->latest()->get(),'types'=>ActivityType::where('active',1)->get()]);}
- public function storePost(Request $r){$d=$r->validate(['content'=>'required|max:2000','title'=>'nullable|max:120','activity_type_id'=>'nullable|exists:activity_types,id','tree_count'=>'nullable|integer|min:0','location'=>'nullable|max:120','activity_date'=>'nullable|date','privacy'=>'required|in:public,private']);$d+=['user_id'=>Auth::id(),'tree_count'=>$d['tree_count']??0,'request_points'=>$r->boolean('request_points')];$d['status']=$d['request_points']||SystemSetting::valueOf('auto_approve_story','1')!=='1'?'pending':'published';Post::create($d);return back()->with('success',$d['status']==='pending'?'ส่งโพสต์ให้ผู้ดูแลตรวจสอบแล้ว':'เผยแพร่โพสต์แล้ว');}
+ public function storePost(Request $r)
+ {
+  $d=$r->validate([
+   'content'=>'required|max:2000','title'=>'nullable|max:120',
+   'activity_type_id'=>'nullable|exists:activity_types,id','tree_count'=>'nullable|integer|min:0',
+   'location'=>'nullable|max:120','activity_date'=>'nullable|date','privacy'=>'required|in:public,private',
+   'image'=>['bail',\Illuminate\Validation\Rule::requiredIf($r->boolean('request_points')),
+    'nullable','file','image','mimes:jpg,jpeg,png','mimetypes:image/jpeg,image/png','extensions:jpg,jpeg,png','max:5120',
+    function ($attribute, $file, $fail) {
+     $info=@getimagesize($file->getRealPath());
+     $mime=(new \finfo(FILEINFO_MIME_TYPE))->file($file->getRealPath());
+     if(!$info || !in_array($info[2],[IMAGETYPE_JPEG,IMAGETYPE_PNG],true) || !in_array($mime,['image/jpeg','image/png'],true)) {
+      $fail('ไฟล์หลักฐานต้องเป็นรูปภาพจริงชนิด JPG, JPEG หรือ PNG');
+     }
+    }],
+  ],[
+   'image.required'=>'กรุณาแนบรูปหลักฐานเมื่อส่งผลงานเพื่อรับคะแนน',
+   'image.file'=>'กรุณาแนบไฟล์รูปภาพ 1 รูป',
+   'image.image'=>'ไฟล์หลักฐานต้องเป็นรูปภาพจริงชนิด JPG, JPEG หรือ PNG',
+   'image.mimes'=>'รองรับเฉพาะรูป JPG, JPEG และ PNG เท่านั้น',
+   'image.mimetypes'=>'รองรับเฉพาะรูป JPG, JPEG และ PNG เท่านั้น',
+   'image.extensions'=>'นามสกุลไฟล์ต้องเป็น JPG, JPEG หรือ PNG',
+   'image.max'=>'รูปหลักฐานต้องมีขนาดไม่เกิน 5 MB',
+   'image.uploaded'=>'อัปโหลดรูปไม่สำเร็จ กรุณาเลือกไฟล์ JPG, JPEG หรือ PNG ขนาดไม่เกิน 5 MB',
+  ]);
+  unset($d['image']);
+  $d+=['user_id'=>Auth::id(),'tree_count'=>$d['tree_count']??0,'request_points'=>$r->boolean('request_points')];
+  $d['status']=$d['request_points']||SystemSetting::valueOf('auto_approve_story','1')!=='1'?'pending':'published';
+  $path=null;
+  try {
+   if($r->hasFile('image')) $d['image']=$path=$r->file('image')->store('posts','evidence');
+   DB::transaction(fn()=>Post::create($d));
+  } catch (\Throwable $e) {
+   if($path) Storage::disk('evidence')->delete($path);
+   throw $e;
+  }
+  return back()->with('success',$d['status']==='pending'?'ส่งโพสต์ให้ผู้ดูแลตรวจสอบแล้ว':'เผยแพร่โพสต์แล้ว');
+ }
+ public function evidence(Request $r, Post $post)
+ {
+  abort_unless(Post::visibleTo($r->user())->whereKey($post->id)->exists(),403);
+  $disk=Storage::disk('evidence');
+  abort_unless($post->image && $disk->exists($post->image),404);
+  return $disk->response($post->image,null,[
+   'Cache-Control'=>'private, no-store, max-age=0',
+   'X-Content-Type-Options'=>'nosniff',
+  ]);
+ }
  public function like(Post $post){$q=Like::where(['user_id'=>Auth::id(),'post_id'=>$post->id])->first();$q?$q->delete():Like::create(['user_id'=>Auth::id(),'post_id'=>$post->id]);return back();} public function comment(Request $r,Post $post){$d=$r->validate(['content'=>'required|max:500']);Comment::create($d+['user_id'=>Auth::id(),'post_id'=>$post->id]);return back();}
- public function dashboard(){$u=Auth::user();return view('dashboard',['postCount'=>$u->posts()->count(),'treeCount'=>$u->posts()->where('status','approved')->sum('tree_count'),'pending'=>$u->posts()->where('status','pending')->count(),'recent'=>$u->posts()->latest()->take(4)->get()]);} public function profile(?User $user=null){$user=$user?:Auth::user();return view('profile',['profile'=>$user,'posts'=>$user->posts()->with(['activityType','likes','comments'])->latest()->get(),'badges'=>$user->badges]);} public function activities(){return view('activities',['posts'=>Auth::user()->posts()->with('activityType')->where('request_points',1)->latest()->get()]);} public function points(){return view('points',['transactions'=>PointsTransaction::where('user_id',Auth::id())->latest()->get()]);}
+ public function dashboard(){$u=Auth::user();return view('dashboard',['postCount'=>$u->posts()->count(),'treeCount'=>$u->posts()->where('status','approved')->sum('tree_count'),'pending'=>$u->posts()->where('status','pending')->count(),'recent'=>$u->posts()->latest()->take(4)->get()]);} public function profile(?User $user=null){$user=$user?:Auth::user();return view('profile',['profile'=>$user,'posts'=>$user->posts()->visibleTo(Auth::user())->with(['activityType','likes','comments'])->latest()->get(),'badges'=>$user->badges]);} public function activities(){return view('activities',['posts'=>Auth::user()->posts()->with('activityType')->where('request_points',1)->latest()->get()]);} public function points(){return view('points',['transactions'=>PointsTransaction::where('user_id',Auth::id())->latest()->get()]);}
  public function rewards(){return view('rewards',['rewards'=>Reward::where('status','active')->get(),'redemptions'=>RewardRedemption::with('reward')->where('user_id',Auth::id())->latest()->get()]);} public function redeem(Reward $reward){$u=Auth::user();if($u->points<$reward->points_required||$reward->stock<1)return back()->withErrors(['reward'=>'คะแนนไม่พอหรือสินค้าหมด']);DB::transaction(function()use($u,$reward){$u->decrement('points',$reward->points_required);$reward->decrement('stock');RewardRedemption::create(['user_id'=>$u->id,'reward_id'=>$reward->id,'points_spent'=>$reward->points_required,'redemption_code'=>'GP-'.Str::upper(Str::random(8))]);PointsTransaction::create(['user_id'=>$u->id,'amount'=>-$reward->points_required,'type'=>'spend','description'=>'แลก '.$reward->name,'balance_after'=>$u->fresh()->points]);});return back()->with('success','แลกรางวัลสำเร็จแล้ว');}
  public function challenges(){return view('challenges',['challenges'=>Challenge::with('activityType')->where('active',1)->get(),'progress'=>DB::table('challenge_progress')->where('user_id',Auth::id())->get()->keyBy('challenge_id')]);} public function leaderboard(){abort_if(SystemSetting::valueOf('ranking_enabled','1')!=='1',404);return view('leaderboard',['users'=>User::where('role','user')->where('status','active')->where('join_ranking',1)->orderByDesc('points')->get()]);}
  public function admin(){abort_unless(Auth::user()->role==='admin',403);return view('admin',['users'=>User::count(),'posts'=>Post::count(),'trees'=>Post::where('status','approved')->sum('tree_count'),'points'=>PointsTransaction::where('amount','>',0)->sum('amount'),'pending'=>Post::with(['user','activityType'])->where('status','pending')->latest()->get(),'rewards'=>Reward::all()]);}
