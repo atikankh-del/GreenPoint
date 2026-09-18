@@ -2,7 +2,10 @@
 
 use App\Http\Controllers\GreenPointController as G; use Illuminate\Support\Facades\Route;
 Route::get('/',[G::class,'home']); Route::get('/login',[G::class,'loginForm'])->name('login'); Route::post('/login',[G::class,'login']); Route::get('/register',[G::class,'registerForm'])->name('register'); Route::post('/register',[G::class,'register']);
-Route::middleware('auth')->group(function(){
+Route::middleware(['auth', \App\Http\Middleware\EnsureActive::class])->group(function(){
+ Route::get('/posts/{post}',[G::class,'showPost'])->name('posts.show');
+ Route::get('/posts/{post}/edit',[G::class,'editPost'])->name('posts.edit');
+ Route::put('/posts/{post}',[G::class,'storePost'])->name('posts.update');
  Route::get('/posts/{post}/image',[G::class,'evidence'])->name('posts.image');
  Route::post('/logout',[G::class,'logout'])->name('logout'); Route::get('/feed',[G::class,'feed'])->name('feed'); Route::post('/posts',[G::class,'storePost'])->name('posts.store'); Route::post('/posts/{post}/like',[G::class,'like'])->name('posts.like'); Route::post('/posts/{post}/comments',[G::class,'comment'])->name('comments.store');
  Route::get('/dashboard',[G::class,'dashboard'])->name('dashboard'); Route::get('/profile/{user?}',[G::class,'profile'])->name('profile'); Route::get('/activities',[G::class,'activities'])->name('activities'); Route::get('/points',[G::class,'points'])->name('points'); Route::get('/rewards',[G::class,'rewards'])->name('rewards'); Route::post('/rewards/{reward}/redeem',[G::class,'redeem'])->name('rewards.redeem'); Route::get('/challenges',[G::class,'challenges'])->name('challenges'); Route::get('/leaderboard',[G::class,'leaderboard'])->name('leaderboard'); Route::get('/admin',[G::class,'admin'])->name('admin'); Route::post('/admin/posts/{post}/review',[G::class,'review'])->name('admin.review');

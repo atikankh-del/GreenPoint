@@ -1,1 +1,18 @@
-@extends('layouts.app') @section('title','ภารกิจสีเขียว') @section('content')<div class="page-head"><div><h1>ภารกิจประจำสัปดาห์</h1><p>ทำเรื่องดีให้ครบ รับคะแนนพิเศษก่อนหมดเวลา</p></div><div class="countdown">⏱ เหลือ {{now()->diffInDays(now()->endOfWeek())}} วัน</div></div><div class="challenge-grid">@foreach($challenges as $c)@php($p=$progress->get($c->id)?->progress??0)<div class="card challenge"><div class="challenge-icon">{{$c->icon}}</div><small>{{$c->activityType?->name}}</small><h2>{{$c->title}}</h2><p>{{$c->description}}</p><div class="progress tall"><i style="width:{{min(100,$p/$c->target*100)}}%"></i></div><div class="challenge-bottom"><span><b>{{$p}} / {{$c->target}}</b> ครั้ง</span><b>⭐ +{{$c->reward_points}}</b></div><button class="btn full" {{$p<$c->target?'disabled':''}}>{{$p>=$c->target?'รับรางวัล':'กำลังทำภารกิจ'}}</button></div>@endforeach</div><div class="card challenge-note"><span>🌍</span><div><h3>ทุกภารกิจคือการเปลี่ยนแปลง</h3><p>เมื่อสมาชิก GreenPoint ทุกคนช่วยกัน เราสามารถลดขยะและเพิ่มพื้นที่สีเขียวได้มากกว่าที่คิด</p></div><b>สัปดาห์นี้ชุมชนทำแล้ว<br><strong>1,284 กิจกรรม</strong></b></div>@endsection
+@extends('layouts.app')
+@section('title','ภารกิจสีเขียว')
+@section('content')
+<div class="page-head"><div><h1>ภารกิจสีเขียว</h1><p>นับจากวันที่ทำกิจกรรมที่ได้รับอนุมัติ รับคะแนนอัตโนมัติเมื่อครบเกณฑ์</p></div></div>
+<div class="challenge-grid">
+@forelse($challenges as $c)
+@php($row=$progress->get($c->id))
+@php($p=$row?->progress??0)
+<div class="card challenge"><div class="challenge-icon">{{$c->icon}}</div><h2>{{$c->title}}</h2><p>{{$c->description}}</p>
+<p>{{$c->starts_at->format('d/m/Y')}} – {{$c->ends_at->format('d/m/Y')}}</p>
+<small>{{$c->activityType?->name??'ทุกกิจกรรม'}} · {{['trees'=>'นับจำนวนต้นไม้','days'=>'นับจำนวนวันที่ทำกิจกรรม ไม่ต้องติดต่อกัน','activities'=>'นับจำนวนกิจกรรม'][$c->metric]??'นับจำนวนกิจกรรม'}}</small>
+<div class="progress tall"><i style="width:{{min(100,$p/max(1,$c->target)*100)}}%"></i></div>
+<div class="challenge-bottom"><span>{{$p}} / {{$c->target}}</span><b>⭐ +{{$c->reward_points}}</b></div>
+<p class="status">{{$row?->claimed_at?'✓ ได้รับรางวัลแล้ว':(today()->lt($c->starts_at)?'ยังไม่เริ่ม':(today()->gt($c->ends_at)?'สิ้นสุดช่วงกิจกรรม · รอผลตรวจหลักฐาน':'กำลังทำภารกิจ'))}}</p>
+</div>
+@empty<div class="card">ยังไม่มีภารกิจ</div>@endforelse
+</div>
+@endsection

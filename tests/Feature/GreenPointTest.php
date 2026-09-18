@@ -36,6 +36,7 @@ class GreenPointTest extends TestCase
 
     public function test_admin_approval_awards_points(): void
     {
+        \App\Models\Challenge::query()->update(['active'=>false]);
         $admin=User::where('role','admin')->firstOrFail(); $member=User::findOrFail(1); $before=$member->points;
         $post=Post::create(['user_id'=>$member->id,'activity_type_id'=>ActivityType::where('name','ปลูกต้นไม้')->value('id'),'content'=>'หลักฐาน','tree_count'=>2,'privacy'=>'public','request_points'=>true,'status'=>'pending']);
         $this->actingAs($admin)->post(route('admin.review',$post),['status'=>'approved'])->assertSessionHas('success');

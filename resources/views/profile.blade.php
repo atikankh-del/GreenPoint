@@ -3,7 +3,7 @@
 @section('content')
 <div class="profile-cover">
  <div class="cover-shapes"><i></i><i></i><i></i></div>
- <div class="profile-id"><div class="avatar xlarge">{{mb_substr($profile->name,0,1)}}</div><div><h1>{{$profile->name}}</h1><p>{{$profile->bio}}</p><span>🌲 Forest Guardian · ⭐ {{number_format($profile->points)}} คะแนน</span></div></div>
+ <div class="profile-id"><div class="avatar xlarge">{{mb_substr($profile->name,0,1)}}</div><div><h1>{{$profile->name}}</h1><p>{{$profile->bio}}</p><span>🌲 {{$profile->level_info['name']}} · ⭐ {{number_format($profile->points)}} คะแนน</span></div></div>
 </div>
 <div class="profile-stats"><div><b>{{$posts->sum('tree_count')}}</b><span>ต้นไม้ที่ปลูก</span></div><div><b>{{$posts->count()}}</b><span>กิจกรรม</span></div><div><b>{{$badges->count()}}</b><span>Badge</span></div><div><b>{{number_format($profile->points)}}</b><span>คะแนนสะสม</span></div></div>
 <div class="two-col profile-cols">
@@ -18,6 +18,6 @@
   <article class="card simple-post"><div class="list-row"><div class="avatar">{{mb_substr($profile->name,0,1)}}</div><span><b>{{$profile->name}}</b><small>{{$p->created_at->diffForHumans()}}</small></span></div><h3>{{$p->title}}</h3><p>{{$p->content}}</p>@include('partials.evidence', ['post'=>$p])@if($p->activityType)<div class="activity-meta"><span>{{$p->activityType->icon}} {{$p->activityType->name}}</span><b>{{$p->points_awarded?'+'.$p->points_awarded.' คะแนน':''}}</b></div>@endif</article>
   @empty<div class="card empty">ยังไม่มีโพสต์</div>@endforelse
  </section>
- <aside class="right"><div class="card"><h3>เส้นทางระดับ</h3><div class="level-banner compact"><div>🌲</div><span><b>Forest Guardian</b><small>ระดับ 5</small></span></div><div class="progress"><i style="width:82%"></i></div><small>{{number_format($profile->points)}} / 3,000 XP</small></div><div class="card tip"><b>ผลลัพธ์เพื่อโลก</b><p>ต้นไม้ของคุณช่วยดูดซับ CO₂ โดยประมาณ <strong>{{$posts->sum('tree_count')*9}} กก./ปี</strong></p></div></aside>
+ <aside class="right"><div class="card"><h3>เส้นทางระดับ</h3><div class="level-banner compact"><div>🌲</div><span><b>{{$profile->level_info['name']}}</b><small>ระดับ {{$profile->level_info['number']}}</small></span></div><div class="progress"><i style="width:{{$profile->level_info['percent']}}%"></i></div><small>{{number_format($profile->level_info['xp'])}} XP · {{ $profile->level_info['next'] ? 'ระดับถัดไป '.$profile->level_info['next'].' XP' : 'ระดับสูงสุด' }}</small></div><div class="card tip"><b>ผลลัพธ์เพื่อโลก</b><p>ต้นไม้ของคุณช่วยดูดซับ CO₂ โดยประมาณ <strong>{{$posts->sum('tree_count')*9}} กก./ปี</strong></p></div></aside>
 </div>
 @endsection

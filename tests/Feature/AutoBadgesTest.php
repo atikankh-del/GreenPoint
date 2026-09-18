@@ -17,6 +17,8 @@ class AutoBadgesTest extends TestCase
     {
         parent::setUp();
         $this->seed();
+        // Isolate badge accounting from independent challenge rewards.
+        \App\Models\Challenge::query()->update(['active'=>false]);
         DB::table('user_badges')->delete();
         Badge::query()->delete();
         PointsTransaction::query()->delete();

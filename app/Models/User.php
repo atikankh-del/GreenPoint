@@ -3,13 +3,14 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     /**
@@ -48,7 +49,40 @@ class User extends Authenticatable
         ];
     }
 
-    public function posts() { return $this->hasMany(Post::class); }
-    public function comments() { return $this->hasMany(Comment::class); }
-    public function badges() { return $this->belongsToMany(Badge::class, 'user_badges')->withPivot('earned_at'); }
+    public function getLevelInfoAttribute(): array
+    {
+        $xp = (int) $this->posts()->where('request_points', true)->where('status', 'approved')->sum('points_awarded');
+        $levels = [0 => 'Seed', 100 => 'Sprout', 300 => 'Plant', 700 => 'Tree', 1500 => 'Forest Guardian', 3000 => 'Green Hero'];
+        $floor = 0;
+        $name = 'Seed';
+        $number = 1;
+        $next = null;
+        foreach ($levels as $threshold => $label) {
+            if ($xp >= $threshold) {
+                $floor = $threshold;
+                $name = $label;
+            } else {
+                $next = $threshold;
+                break;
+            }
+        }
+        $number = array_search($floor, array_keys($levels)) + 1;
+
+        return ['xp' => $xp, 'name' => $name, 'number' => $number, 'next' => $next, 'percent' => $next ? min(100, ($xp - $floor) / ($next - $floor) * 100) : 100];
+    }
+
+    public function posts()
+    {
+        return $this->hasMany(Post::class);
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
+
+    public function badges()
+    {
+        return $this->belongsToMany(Badge::class, 'user_badges')->withPivot('earned_at');
+    }
 }

@@ -12,7 +12,7 @@
         preview.hidden = true;
         remove.hidden = true;
     };
-    points.addEventListener('change', () => { input.required = points.checked; });
+    points.addEventListener('change', () => { input.required = points.checked && input.dataset.existing !== '1'; });
     input.addEventListener('change', () => {
         clearPreview();
         error.textContent = '';
