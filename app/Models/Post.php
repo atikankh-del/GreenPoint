@@ -1,7 +1,7 @@
 <?php
 namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
-class Post extends Model { public function scopeVisibleTo($query, ?User $viewer)
+class Post extends Model { use \Illuminate\Database\Eloquent\SoftDeletes; public function scopeVisibleTo($query, ?User $viewer)
  {
   return $query->where(function ($visible) use ($viewer) {
    $visible->where(function ($public) {

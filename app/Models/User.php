@@ -51,7 +51,7 @@ class User extends Authenticatable
 
     public function getLevelInfoAttribute(): array
     {
-        $xp = (int) $this->posts()->where('request_points', true)->where('status', 'approved')->sum('points_awarded');
+        $xp = (int) $this->posts()->withTrashed()->where('request_points', true)->where('status', 'approved')->sum('points_awarded');
         $levels = [0 => 'Seed', 100 => 'Sprout', 300 => 'Plant', 700 => 'Tree', 1500 => 'Forest Guardian', 3000 => 'Green Hero'];
         $floor = 0;
         $name = 'Seed';

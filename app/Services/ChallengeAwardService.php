@@ -12,7 +12,7 @@ class ChallengeAwardService
 {
     public function progress(User $user, Challenge $challenge): int
     {
-        $posts = Post::where('user_id', $user->id)->where('request_points', true)->where('status', 'approved')
+        $posts = Post::withTrashed()->where('user_id', $user->id)->where('request_points', true)->where('status', 'approved')
             ->whereRaw('date(COALESCE(activity_date, created_at)) >= ?', [$challenge->starts_at->toDateString()])
             ->whereRaw('date(COALESCE(activity_date, created_at)) <= ?', [$challenge->ends_at->toDateString()])
             ->whereRaw('date(COALESCE(activity_date, created_at)) <= ?', [today()->toDateString()]);

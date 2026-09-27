@@ -91,7 +91,7 @@ class CompletionTest extends TestCase
         $payload = ['content' => 'รายละเอียดใหม่', 'privacy' => 'private', 'activity_type_id' => $post->activity_type_id, 'tree_count' => 2];
         $this->actingAs($user)->put(route('posts.update', $post), $payload)->assertRedirect(route('activities'))->assertSessionHasNoErrors();
         $this->assertDatabaseHas('posts', ['id' => $post->id, 'status' => 'pending', 'review_note' => null, 'image' => 'posts/proof.png', 'content' => 'รายละเอียดใหม่']);
-        $this->put(route('posts.update', $post), $payload)->assertStatus(409);
+        $this->put(route('posts.update', $post), $payload)->assertRedirect(route('posts.show', $post));
     }
 
     public function test_suspended_session_cannot_read_or_mutate(): void

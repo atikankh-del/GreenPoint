@@ -11,10 +11,10 @@ class BadgeAwardService
     public function awardEligibleBadges(User $user): array
     {
         $metrics = [
-            'trees' => (int) Post::query()->where('user_id', $user->id)->where('request_points', true)->where('status', 'approved')
+            'trees' => (int) Post::withTrashed()->where('user_id', $user->id)->where('request_points', true)->where('status', 'approved')
                 ->whereHas('activityType', fn ($query) => $query->where('counts_trees', true))->sum('tree_count'),
-            'activities' => Post::query()->where('user_id', $user->id)->where('request_points', true)->where('status', 'approved')->count(),
-            'points' => (int) Post::query()->where('user_id', $user->id)->where('request_points', true)->where('status', 'approved')->sum('points_awarded'),
+            'activities' => Post::withTrashed()->where('user_id', $user->id)->where('request_points', true)->where('status', 'approved')->count(),
+            'points' => (int) Post::withTrashed()->where('user_id', $user->id)->where('request_points', true)->where('status', 'approved')->sum('points_awarded'),
         ];
 
         $awarded = [];

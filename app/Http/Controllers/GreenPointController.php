@@ -149,11 +149,21 @@ return back()->withErrors(['email' => 'อีเมลหรือรหัส�
         return view('post', ['post' => $post->load(['user', 'activityType'])]);
     }
 
+    public function updatePost(Request $request, Post $post)
+    {
+        abort_unless($post->user_id === Auth::id(), 403);
+        if ($post->status === 'rejected') return $this->storePost($request, $post);
+        $data=$request->validate(['title'=>'nullable|string|max:120','content'=>'required|string|max:2000','privacy'=>'required|in:public,private']);
+        DB::transaction(function()use($post,$data){
+            $locked=Post::lockForUpdate()->findOrFail($post->id);
+            abort_if($locked->status==='rejected',409,'สถานะโพสต์เปลี่ยน กรุณาโหลดหน้าใหม่');
+            $locked->update($data);
+        });
+        return redirect()->route('posts.show',$post)->with('success','บันทึกการแก้ไขโพสต์แล้ว');
+    }
     public function editPost(Post $post)
     {
         abort_unless($post->user_id === Auth::id(), 403);
-        abort_unless($post->status === 'rejected', 409);
-
         return view('edit-post', ['post' => $post, 'types' => ActivityType::where('active', true)->get()]);
     }
 
@@ -234,7 +244,7 @@ return back()->withErrors(['email' => 'อีเมลหรือรหัส�
             PointsTransaction::create(['user_id' => $u->id, 'amount' => -$reward->points_required, 'type' => 'spend', 'description' => 'แลก '.$reward->name, 'balance_after' => $u->fresh()->points]);
         }, 5);
 
-        return back()->with('success', 'แลกรางวัลสำเร็จแล้ว');
+        return back()->with('success', 'แลกรางวัลสำเร็จแล้ว รอผู้ดูแลแจ้งพร้อมรับ แล้วนำรหัสมารับที่จุดรับรางวัล');
     }
 
     public function challenges()
@@ -385,7 +395,21 @@ return view('admin-manage', $data);
     public function redemptionStatus(Request $r, RewardRedemption $redemption)
     {
         $this->adminOnly();
-        $redemption->update($r->validate(['status' => 'required|in:pending,approved,shipped,completed,cancelled']));
+        $status=$r->validate(['status'=>'required|in:pending,approved,completed,cancelled'])['status'];
+        DB::transaction(function()use($redemption,$status){
+            if(DB::getDriverName()==='sqlite') DB::table('users')->where('id',$redemption->user_id)->update(['points'=>DB::raw('points')]);
+            $user=User::lockForUpdate()->findOrFail($redemption->user_id);
+            $reward=Reward::lockForUpdate()->findOrFail($redemption->reward_id);
+            $row=RewardRedemption::lockForUpdate()->findOrFail($redemption->id);
+            if($row->status===$status)return;
+            $allowed=['pending'=>['approved','cancelled'],'approved'=>['completed','cancelled']];
+            if(!in_array($status,$allowed[$row->status]??[]))throw ValidationException::withMessages(['status'=>'ไม่สามารถเปลี่ยนสถานะย้อนหลังหรือข้ามขั้นตอนรับรางวัล']);
+            if($status==='cancelled'){
+                $user->increment('points',$row->points_spent);$reward->increment('stock');
+                PointsTransaction::create(['user_id'=>$user->id,'amount'=>$row->points_spent,'type'=>'refund','description'=>'คืนคะแนนจากการยกเลิก '.$row->redemption_code,'balance_after'=>$user->fresh()->points,'reference_type'=>RewardRedemption::class,'reference_id'=>$row->id]);
+            }
+            $row->update(['status'=>$status]);
+        },5);
 
         return back()->with('success', 'อัปเดตสถานะการรับรางวัลแล้ว');
     }
@@ -434,18 +458,34 @@ return view('admin-manage', $data);
         return back()->with('success', 'อัปเดตรายงานแล้ว');
     }
 
+    public function deleteOwnPost(Post $post)
+    {
+        abort_unless($post->user_id===Auth::id(),403);
+        $post->delete();
+        return redirect()->route('profile')->with('success','ลบโพสต์แล้ว ประวัติคะแนนและรางวัลที่ได้รับยังคงอยู่');
+    }
+
+    public function reportPost(Request $request, Post $post)
+    {
+        abort_unless(Post::visibleTo(Auth::user())->whereKey($post->id)->exists(),403);
+        abort_if($post->user_id===Auth::id(),422);
+        $data=$request->validate(['reason'=>'required|string|max:1000']);
+        Report::firstOrCreate(['reporter_id'=>Auth::id(),'post_id'=>$post->id,'status'=>'pending'],$data);
+        return back()->with('success','ส่งรายงานให้ผู้ดูแลแล้ว');
+    }
+
     public function deletePost(Post $post)
     {
         $this->adminOnly();
         $post->delete();
 
-        return back()->with('success', 'ลบโพสต์และข้อมูลที่เกี่ยวข้องแล้ว');
+        return back()->with('success', 'ลบโพสต์แล้ว เก็บประวัติคะแนนและรางวัลไว้');
     }
 
     public function saveSettings(Request $r)
     {
         $this->adminOnly();
-        $d = $r->validate(['site_name' => 'required|max:100', 'welcome_message' => 'required|max:255', 'support_email' => 'required|email']);
+        $d = $r->validate(['site_name' => 'required|max:100', 'welcome_message' => 'required|max:255', 'support_email' => 'required|email', 'pickup_location' => 'nullable|string|max:255', 'pickup_hours' => 'nullable|string|max:255']);
         foreach ($d as $k => $v) {
             SystemSetting::updateOrCreate(['key' => $k],['value' => $v, 'type' => 'text']);
         }foreach (['maintenance_mode', 'auto_approve_story', 'ranking_enabled'] as $k) {

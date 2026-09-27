@@ -15,7 +15,8 @@
   </div></div>
   <h2 class="section-title">โพสต์ของ {{$profile->name}}</h2>
   @forelse($posts as $p)
-  <article class="card simple-post"><div class="list-row"><div class="avatar">{{mb_substr($profile->name,0,1)}}</div><span><b>{{$profile->name}}</b><small>{{$p->created_at->diffForHumans()}}</small></span></div><h3>{{$p->title}}</h3><p>{{$p->content}}</p>@include('partials.evidence', ['post'=>$p])@if($p->activityType)<div class="activity-meta"><span>{{$p->activityType->icon}} {{$p->activityType->name}}</span><b>{{$p->points_awarded?'+'.$p->points_awarded.' คะแนน':''}}</b></div>@endif</article>
+  <article class="card simple-post"><div class="list-row"><div class="avatar">{{mb_substr($profile->name,0,1)}}</div><span><b>{{$profile->name}}</b><small>{{$p->created_at->diffForHumans()}}</small></span></div><h3>{{$p->title}}</h3><p>{{$p->content}}</p>@include('partials.evidence', ['post'=>$p])@if($p->activityType)<div class="activity-meta"><span>{{$p->activityType->icon}} {{$p->activityType->name}}</span><b>{{$p->points_awarded?'+'.$p->points_awarded.' คะแนน':''}}</b></div>@endif
+@include('partials.post-actions',['post'=>$p])</article>
   @empty<div class="card empty">ยังไม่มีโพสต์</div>@endforelse
  </section>
  <aside class="right"><div class="card"><h3>เส้นทางระดับ</h3><div class="level-banner compact"><div>🌲</div><span><b>{{$profile->level_info['name']}}</b><small>ระดับ {{$profile->level_info['number']}}</small></span></div><div class="progress"><i style="width:{{$profile->level_info['percent']}}%"></i></div><small>{{number_format($profile->level_info['xp'])}} XP · {{ $profile->level_info['next'] ? 'ระดับถัดไป '.$profile->level_info['next'].' XP' : 'ระดับสูงสุด' }}</small></div><div class="card tip"><b>ผลลัพธ์เพื่อโลก</b><p>ต้นไม้ของคุณช่วยดูดซับ CO₂ โดยประมาณ <strong>{{$posts->sum('tree_count')*9}} กก./ปี</strong></p></div></aside>
